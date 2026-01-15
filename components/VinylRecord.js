@@ -67,7 +67,6 @@ const CassetteHubs = ({ size, center }) => {
     return `${hub(center - size*0.2)} ${hub(center + size*0.2)}`;
 }
 
-// ... other style renderers converted similarly ...
 const Soundwave = ({size, center, config}) => {
     const baseRadius = size * 0.2;
     const maxAmplitude = size * (config.soundwaveAmplitude / 100);
@@ -82,6 +81,72 @@ const Soundwave = ({size, center, config}) => {
     pathData += " Z";
     return `<path d="${pathData}" fill="none" stroke="${color}" stroke-width="${config.lineWidth}" />`;
 }
+
+const Equalizer = ({size, center, config}) => {
+    let elements = '';
+    const numBars = config.equalizerBars;
+    const angleStep = 360 / numBars;
+    const maxBarHeight = size * (config.equalizerMaxHeight / 100);
+    const baseRadius = size * 0.25;
+    for (let i = 0; i < numBars; i++) {
+        const startAngle = i * angleStep;
+        const endAngle = (i + 0.5) * angleStep;
+        const barHeight = maxBarHeight * randFloat(0.1, 1);
+        const hue = (startAngle / 360 * 150 + 180) % 360;
+        const color = config.neon ? `hsl(${hue}, 90%, 70%)` : config.lineColor;
+        elements += `<path d="${describeArc(center, center, baseRadius, startAngle, endAngle)}" stroke="${color}" stroke-width="${barHeight}" fill="none" />`;
+    }
+    return elements;
+}
+
+const Sunburst = ({size, center, config}) => {
+    let elements = '';
+    const numLines = config.sunburstLines;
+    for(let i=0; i < numLines; i++) {
+        const angle = i * (360 / numLines);
+        const start = polarToCartesian(center, center, size * 0.18, angle);
+        const end = polarToCartesian(center, center, size * randFloat(0.3, 0.45), angle);
+        const color = config.neon ? `hsl(${angle}, 80%, 75%)` : config.lineColor;
+        elements += `<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="${color}" stroke-width="${config.lineWidth}" />`;
+    }
+    return elements;
+}
+
+const GridStyle = ({size, config}) => {
+    let lines = '';
+    const step = size / config.gridDensity;
+    const color = config.lineColor;
+    for(let i=0; i <= config.gridDensity; i++) {
+        lines += `<line x1="${i * step}" y1="0" x2="${i * step}" y2="${size}" stroke="${color}" stroke-width="${config.lineWidth}" opacity="0.3" />`;
+        lines += `<line x1="0" y1="${i * step}" x2="${size}" y2="${i * step}" stroke="${color}" stroke-width="${config.lineWidth}" opacity="0.3" />`;
+    }
+    return lines;
+}
+
+const LissajousStyle = ({size, center, config}) => {
+    const points = [];
+    const a = 3, b = 2, delta = Math.PI / 2;
+    const R = size * 0.4;
+    for (let t = 0; t <= 2 * Math.PI; t += 0.05) {
+        const x = center + R * Math.sin(a * t + delta);
+        const y = center + R * Math.sin(b * t);
+        points.push(`${x},${y}`);
+    }
+    return `<polyline points="${points.join(' ')}" fill="none" stroke="${config.lineColor}" stroke-width="${config.lineWidth}" />`;
+}
+
+const NebulaStyle = ({size, center}) => {
+    let blobs = '';
+    for (let i = 0; i < 5; i++) {
+        const r = size * randFloat(0.1, 0.3);
+        const x = center + randFloat(-size*0.2, size*0.2);
+        const y = center + randFloat(-size*0.2, size*0.2);
+        const color = `hsl(${randInt(180, 300)}, 70%, 60%)`;
+        blobs += `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" opacity="0.2" style="filter: blur(20px)" />`;
+    }
+    return blobs;
+}
+
 
 // --- Main Exported Function ---
 export function renderVinylRecordToHtml(config) {
@@ -99,7 +164,11 @@ export function renderVinylRecordToHtml(config) {
       case 'classic': styleHtml = ClassicGrooves({ size, center }); break;
       case 'cassette': styleHtml = CassetteHubs({ size, center }); break;
       case 'soundwave': styleHtml = Soundwave({ size, center, config: vinylConfig }); break;
-      // Add other cases here
+      case 'equalizer': styleHtml = Equalizer({ size, center, config: vinylConfig }); break;
+      case 'sunburst': styleHtml = Sunburst({ size, center, config: vinylConfig }); break;
+      case 'grid': styleHtml = GridStyle({ size, config: vinylConfig }); break;
+      case 'lissajous': styleHtml = LissajousStyle({ size, center, config: vinylConfig }); break;
+      case 'nebula': styleHtml = NebulaStyle({ size, center }); break;
   }
 
   return `

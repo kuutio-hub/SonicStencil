@@ -1,5 +1,6 @@
 import { renderVinylRecordToHtml } from './VinylRecord.js';
 import { renderQRCodeToHtml } from './QRCode.js';
+import { getState } from '../state.js';
 
 function RotatedText({ text, fontSize, side, rotation, color }) {
     let angle = -90;
@@ -129,37 +130,43 @@ export function renderCardToHtml(data, config, side) {
         height: 100%;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        justify-content: center;
         align-items: center;
         text-align: center;
-        padding: 10px 0;
+        padding: 10px 5px;
         box-sizing: border-box;
     ">
-        <div style="flex: 1; display: flex; align-items: flex-end; justify-content: center;">
-            <div style="width: 85%;">
-                <p style="
-                    font-size: ${back.artistFontSize}px;
-                    color: ${back.artistColor};
-                    font-weight: bold;
-                    line-height: 1.1;
-                ">${data.artist}</p>
-            </div>
+        <div style="width: 90%;">
+            <p style="
+                font-size: ${back.artistFontSize}px;
+                color: ${back.artistColor};
+                font-weight: bold;
+                line-height: 1.1;
+                margin-bottom: auto;
+            ">${data.artist}</p>
         </div>
-        <div style="flex: 0; display: flex; align-items: center; justify-content: center; padding: 5px 0;">
+        <div style="padding: 4px 0;">
             <h2 style="
                 font-size: ${back.yearFontSize}px;
                 color: ${back.yearColor};
                 font-weight: 900;
             ">${data.year}</h2>
         </div>
-        <div style="flex: 1; display: flex; align-items: flex-start; justify-content: center;">
-            <div style="width: 85%;">
-                <p style="
-                    font-size: ${back.titleFontSize}px;
-                    color: ${back.titleColor};
-                    line-height: 1.1;
-                ">${data.title}</p>
-            </div>
+        <div style="width: 90%; margin: 4px 0; flex-grow: 1; display: flex; align-items: center;">
+             <p style="
+                font-size: ${back.factFontSize}px;
+                color: ${back.factColor};
+                line-height: 1.2;
+                font-style: italic;
+             ">${data.fact || ''}</p>
+        </div>
+        <div style="width: 90%;">
+            <p style="
+                font-size: ${back.titleFontSize}px;
+                color: ${back.titleColor};
+                line-height: 1.1;
+                margin-top: auto;
+            ">${data.title}</p>
         </div>
         ${data.code1 ? RotatedText({ text: data.code1, fontSize: back.codeFontSize, side: "left", rotation: back.codeRotation, color: back.artistColor }) : ''}
         ${data.code2 ? RotatedText({ text: data.code2, fontSize: back.codeFontSize, side: "right", rotation: back.codeRotation, color: back.artistColor }) : ''}

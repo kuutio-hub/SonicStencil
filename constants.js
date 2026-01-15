@@ -4,7 +4,7 @@ export const SAMPLE_CARD_DATA = {
   artist: "Queen",
   title: "Bohemian Rhapsody",
   year: "1975",
-  fact: "",
+  fact: "This song has three distinct sections: a ballad segment ending with a guitar solo, an operatic passage, and a hard rock finale.",
   qr_url: "https://open.spotify.com/track/4u7EnebtmKWzANvKgiJJEc",
   code1: "L-01",
   code2: "R-02",
