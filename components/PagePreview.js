@@ -1,5 +1,7 @@
 import { getState, updateState, t } from '../state.js';
 import { renderPreviewContainer, addPreviewContainerListeners } from './ui/PreviewContainer.js';
+import { Button } from './ui/Button.js';
+import { EyeIcon } from './ui/Icons.js';
 
 const PAGE_FORMATS = {
     A4: { width: 210, height: 297 },
@@ -8,8 +10,9 @@ const PAGE_FORMATS = {
 };
 const MM_TO_PX_FACTOR = 3.7795;
 
-export function renderPagePreview(container) {
-  const { designConfig: config, previewsVisible } = getState();
+// Külön exportált függvény a tartalom rendereléséhez, amit a modal is használ
+export function renderPagePreviewContent() {
+  const { designConfig: config } = getState();
   const pageFormat = PAGE_FORMATS[config.page.pageFormat];
   const aspectRatio = pageFormat.width / pageFormat.height;
   
@@ -19,10 +22,11 @@ export function renderPagePreview(container) {
   const pageH_mm = pageFormat.height - (pageConfig.padding * 2 / MM_TO_PX_FACTOR);
   const cardW_mm = cardConfig.width / MM_TO_PX_FACTOR;
   const cardH_mm = cardConfig.height / MM_TO_PX_FACTOR;
-  const gap_mm = pageConfig.gap / MM_TO_PX_FACTOR;
+  const gapX_mm = pageConfig.gapX / MM_TO_PX_FACTOR;
+  const gapY_mm = pageConfig.gapY / MM_TO_PX_FACTOR;
 
-  const cols = Math.max(1, Math.floor(pageW_mm / (cardW_mm + gap_mm)));
-  const rows = Math.max(1, Math.floor(pageH_mm / (cardH_mm + gap_mm)));
+  const cols = Math.max(1, Math.floor((pageW_mm + gapX_mm) / (cardW_mm + gapX_mm)));
+  const rows = Math.max(1, Math.floor((pageH_mm + gapY_mm) / (cardH_mm + gapY_mm)));
   const cardsThatFit = cols * rows;
 
   const cardsToDisplay = config.page.autoFit ? cardsThatFit : Math.min(cardsThatFit, config.page.cardsPerPage);
@@ -39,13 +43,13 @@ export function renderPagePreview(container) {
   `).join('');
   const unit = config.mode === 'token' ? t('tokenUnit') : t('cardUnit');
 
-  const content = `
-      <div class="flex flex-col justify-center items-center h-full p-4 bg-gray-800">
+  return `
+      <div class="flex flex-col justify-center items-center h-full p-4 bg-gray-900">
         <div
           class="bg-white shadow-2xl overflow-hidden border-2 border-gray-500/50"
           style="
             width: 100%;
-            max-width: calc((100vh - 220px) * ${aspectRatio});
+            max-width: calc((80vh) * ${aspectRatio});
             aspect-ratio: ${aspectRatio};
           "
         >
@@ -54,7 +58,8 @@ export function renderPagePreview(container) {
             style="
               grid-template-columns: repeat(${cols}, 1fr);
               grid-template-rows: repeat(${rows}, 1fr);
-              gap: ${Math.max(1, pageConfig.gap / 4)}px;
+              column-gap: ${Math.max(0, pageConfig.gapX / 4)}px;
+              row-gap: ${Math.max(0, pageConfig.gapY / 4)}px;
               padding: ${Math.max(1, pageConfig.padding / 4)}px;
             "
           >
@@ -66,11 +71,27 @@ export function renderPagePreview(container) {
         </p>
       </div>
   `;
+}
+
+export function renderPagePreview(container, isMobileButton = false) {
+  const { previewsVisible } = getState();
+
+  const openModal = () => updateState({ isModalOpen: true, modalContent: 'page', previewZoom: 1 });
+  
+  if (isMobileButton) {
+      container.innerHTML = Button({
+          id: 'mobile-page-preview-opener',
+          content: `${EyeIcon()} View Page Preview`,
+          className: 'w-full h-12'
+      });
+      container.querySelector('#mobile-page-preview-opener').addEventListener('click', openModal);
+      return;
+  }
 
   renderPreviewContainer(container, {
       title: t('pagePreview'),
       isVisible: previewsVisible.page,
-      content
+      content: renderPagePreviewContent()
   });
 
   addPreviewContainerListeners(container, () => {

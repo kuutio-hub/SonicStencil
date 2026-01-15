@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 
 export async function renderQRCodeToHtml(url, config) {
-    const { size, color, bgColor, bgTransparent, frame, frameWidth, frameBgColor } = config;
+    const { size, color, bgColor, bgTransparent, frame, frameWidth, frameBgColor, frameBorderRadius } = config;
 
     if (!url) {
         return `
@@ -44,6 +44,8 @@ export async function renderQRCodeToHtml(url, config) {
                     display: inline-block;
                     line-height: 0;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    border-radius: ${frameBorderRadius}px;
+                    overflow: hidden;
                 ">
                     ${qrCodeImg}
                 </div>

@@ -8,24 +8,37 @@ let state = {
   previewsVisible: { card: true, page: true, editor: true },
   sidebarVisible: true,
   isLoading: false,
+  progress: { percentage: 0, message: '' },
   toasts: [],
   isModalOpen: false,
   language: 'hu',
+  openAccordions: ['appMode'], // Alapértelmezetten nyitva az első
+  sidebarScrollTop: 0,
+  isMobileMenuOpen: false,
+  isMobileActionsOpen: false,
+  previewZoom: 1,
 };
 
 let listeners = [];
 
-export function subscribe(listener) {
-  listeners.push(listener);
-  return function unsubscribe() {
-    listeners = listeners.filter(l => l !== listener);
-  };
+export function subscribe(keys, listener) {
+    if (typeof keys === 'function') { // Támogatja a régi, globális feliratkozást is
+        listener = keys;
+        keys = null;
+    }
+    listeners.push({ keys, listener });
+    return function unsubscribe() {
+        listeners = listeners.filter(l => l.listener !== listener);
+    };
 }
 
-function notify() {
-  for (const listener of listeners) {
-    listener();
-  }
+function notify(changedKeys) {
+    for (const { keys, listener } of listeners) {
+        // Ha nincs 'keys' megadva (globális listener), vagy van átfedés a változott kulcsok és a figyelt kulcsok között
+        if (!keys || keys.some(key => changedKeys.includes(key))) {
+            listener(changedKeys);
+        }
+    }
 }
 
 export function getState() {
@@ -33,21 +46,39 @@ export function getState() {
 }
 
 export function updateState(newState) {
+  const oldState = state;
   state = { ...state, ...newState };
-  notify();
+  const changedKeys = Object.keys(newState).filter(key => oldState[key] !== state[key]);
+  if (changedKeys.length > 0) {
+      notify(changedKeys);
+  }
 }
+
+// Debounce segédfüggvény
+const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+};
+
 
 // Specifikus állapotmódosító függvények (actions)
 export function updateDesignConfig(category, property, value) {
-  const newConfig = JSON.parse(JSON.stringify(state.designConfig));
+    const newConfig = JSON.parse(JSON.stringify(state.designConfig));
   
-  if (category === 'card' && property === 'width') {
-      newConfig.card.width = value;
-      newConfig.card.height = value;
-  } else {
-      newConfig[category][property] = value;
-  }
-  updateState({ designConfig: newConfig });
+    if (category === 'card' && property === 'width') {
+        const numericValue = typeof value === 'string' ? parseFloat(value) : value;
+        newConfig.card.width = numericValue;
+        newConfig.card.height = numericValue;
+    } else {
+        newConfig[category][property] = value;
+    }
+    
+    // A debounce-olt frissítés helyett a sima updateState-et használjuk,
+    // a debounce logikát az index.js-ben, a feliratkozásnál kezeljük.
+    updateState({ designConfig: newConfig });
 }
 
 export function setDesignConfigMode(mode) {
@@ -81,8 +112,18 @@ export function addToast(message, type = 'success') {
     const newToasts = [...state.toasts, { id, message, type }];
     updateState({ toasts: newToasts });
     setTimeout(() => {
-        updateState({ toasts: getState().toasts.filter(t => t.id !== id) });
+        const currentToasts = getState().toasts.filter(t => t.id !== id);
+        updateState({ toasts: currentToasts });
     }, 3000);
+}
+
+// Accordion állapot
+export function toggleAccordion(accordionId) {
+    const { openAccordions } = getState();
+    const newOpenAccordions = openAccordions.includes(accordionId)
+        ? openAccordions.filter(id => id !== accordionId)
+        : [...openAccordions, accordionId];
+    updateState({ openAccordions: newOpenAccordions });
 }
 
 // Lokalizáció

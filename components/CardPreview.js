@@ -1,10 +1,23 @@
 import { getState, updateState, t } from '../state.js';
 import { renderCardToHtml, renderQRCodesInContainer } from './Card.js';
 import { renderPreviewContainer, addPreviewContainerListeners } from './ui/PreviewContainer.js';
-import { EnlargeIcon } from './ui/Icons.js';
+import { EnlargeIcon, EyeIcon } from './ui/Icons.js';
+import { Button } from './ui/Button.js';
 
-export async function renderCardPreview(container) {
+export async function renderCardPreview(container, isMobileButton = false) {
   const { editableSample, designConfig, previewsVisible } = getState();
+  
+  const openModal = () => updateState({ isModalOpen: true, modalContent: 'card', previewZoom: 1 });
+
+  if (isMobileButton) {
+      container.innerHTML = Button({
+          id: 'mobile-card-preview-opener',
+          content: `${EyeIcon()} View Card Preview`,
+          className: 'w-full h-12'
+      });
+      container.querySelector('#mobile-card-preview-opener').addEventListener('click', openModal);
+      return;
+  }
 
   const headerActions = `
      <button id="enlarge-button" class="text-gray-400 hover:text-white" title="${t('enlarge')}">
@@ -40,7 +53,5 @@ export async function renderCardPreview(container) {
       updateState({ previewsVisible: { ...currentVisibility, card: !currentVisibility.card } });
   });
   
-  container.querySelector('#enlarge-button').addEventListener('click', () => {
-      updateState({ isModalOpen: true });
-  });
+  container.querySelector('#enlarge-button').addEventListener('click', openModal);
 }

@@ -23,16 +23,19 @@ const GlitchVinyl = ({ config, size, center }) => {
     const maxRadius = (size / 2) - config.clipMargin;
     const baseInnerRadius = size * 0.05;
     const availableRadius = maxRadius - baseInnerRadius;
-    const step = availableRadius / Math.max(1, config.ringCount);
+    const ringCount = 13; // Belső logika, nem a felhasználó által állítható
+    const step = availableRadius / Math.max(1, ringCount);
+    const segments = config.glitchSegments || 3;
 
-    for (let i = 0; i < config.ringCount; i++) {
+    for (let i = 0; i < ringCount; i++) {
       const radius = baseInnerRadius + step * (i + 0.5);
-      const segments = 3;
       const angleCursor = Math.random() * 360;
-      const span = 360 / segments - config.lineGap;
       
       for (let j = 0; j < segments; j++) {
-        const startAngle = angleCursor + j * (360/segments);
+        const segmentAngle = 360 / segments;
+        const gap = randFloat(config.glitchGapMin, config.glitchGapMax);
+        const span = Math.max(0, segmentAngle - gap);
+        const startAngle = angleCursor + j * segmentAngle;
         const color = config.neon ? `hsl(${randInt(0, 360)}, 100%, 80%)` : config.lineColor;
         const filter = config.glowIntensity > 0 ? `drop-shadow(0 0 ${config.glowIntensity}px ${color})` : 'none';
         paths += `<path d="${describeArc(center, center, radius, startAngle, startAngle + span)}" fill="none" stroke="${color}" stroke-width="${config.lineWidth}" style="filter: ${filter}" />`;
@@ -172,13 +175,13 @@ export function renderVinylRecordToHtml(config) {
   }
 
   return `
-    <div class="absolute inset-0 flex items-center justify-center overflow-visible pointer-events-none">
+    <div class="absolute inset-0 w-full h-full flex items-center justify-center overflow-visible pointer-events-none">
       ${vinylConfig.aiBackground ? `
         <img src="${vinylConfig.aiBackground}" alt="AI Background" class="absolute inset-0 w-full h-full object-cover" style="mix-blend-mode: multiply; opacity: 0.6;" />
       ` : ''}
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="overflow-visible">
         <g>${styleHtml}</g>
-         ${ (vinylConfig.style !== 'cassette') ? `
+         ${ (vinylConfig.style !== 'cassette' && vinylConfig.showCenterLabel) ? `
             <circle cx="${center}" cy="${center}" r="${size * 0.15}" fill="#fff" stroke="#000" stroke-width="1" />
             <circle cx="${center}" cy="${center}" r="${size * 0.02}" fill="#000" />
         `: ''}

@@ -6,47 +6,77 @@ import { renderCardPreview } from './components/CardPreview.js';
 import { renderPagePreview } from './components/PagePreview.js';
 import { renderToastContainer } from './components/ui/Toast.js';
 import { renderEnlargedPreviewModal } from './components/EnlargedPreviewModal.js';
-import { ArrowLeftIcon, ArrowRightIcon } from './components/ui/Icons.js';
+import { ArrowLeftIcon, ArrowRightIcon, GenerateIcon } from './components/ui/Icons.js';
 import { generatePdf } from './lib/pdfGenerator.js';
 import { parseFile } from './lib/fileParser.js';
+import { Button } from './components/ui/Button.js';
 
-async function handleFileParse(file) {
+export async function handleFileParse(file) {
     updateState({ isLoading: true });
     try {
-      const data = await parseFile(file);
-      if (data.length === 0) {
-          throw new Error("File is empty or could not be parsed.");
-      }
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i];
-        if (!row || !row.artist || !row.title || !row.year || !row.qr_url) {
-            throw new Error(`Invalid data in row ${i + 2}. Required headers are: artist, title, year, qr_url`);
+        const normalizeRow = (row) => {
+            const normalized = {};
+            // Fejlécek keresése kis- és nagybetűre érzéketlenül, aliasok kezelésével
+            for (const originalKey in row) {
+                const lowerKey = originalKey.toLowerCase().trim();
+                if (lowerKey === 'artist') normalized.artist = row[originalKey];
+                else if (lowerKey === 'title') normalized.title = row[originalKey];
+                else if (lowerKey === 'year') normalized.year = row[originalKey];
+                else if (lowerKey === 'url' || lowerKey === 'qr_url') normalized.qr_url = row[originalKey];
+                else if (lowerKey === 'code1') normalized.code1 = row[originalKey];
+                else if (lowerKey === 'code2') normalized.code2 = row[originalKey];
+            }
+            return normalized;
+        };
+
+        const parsedData = await parseFile(file);
+        if (parsedData.length === 0) {
+            throw new Error("A fájl üres vagy nem sikerült feldolgozni.");
         }
-      }
-      setCardData(data);
-      addToast(`${data.length} cards loaded successfully!`, 'success');
+        
+        const data = parsedData.map(normalizeRow);
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            // Az i + 2 a fejléc sort és a 0-alapú indexelést veszi figyelembe
+            if (!row || !row.artist || !row.title || !row.year || !row.qr_url) {
+                throw new Error(`Érvénytelen vagy hiányzó adat a(z) ${i + 2}. sorban. Kötelező fejlécek: Artist, Title, Year, URL.`);
+            }
+        }
+        setCardData(data);
+        addToast(`${data.length} kártya sikeresen betöltve!`, 'success');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-      addToast(`Error parsing file: ${errorMessage}`, 'error');
+        const errorMessage = error instanceof Error ? error.message : 'Ismeretlen hiba történt';
+        addToast(`Hiba a fájl feldolgozása közben: ${errorMessage}`, 'error');
     } finally {
-      updateState({ isLoading: false });
+        updateState({ isLoading: false });
     }
 }
 
-async function handleGeneratePdf() {
+
+export async function handleGeneratePdf() {
     const { cardData, designConfig } = getState();
     if (cardData.length === 0 && designConfig.mode === 'card') {
       addToast('Please load card data first.', 'error');
       return;
     }
-    updateState({ isLoading: true });
-    addToast('Generating PDF... This may take a moment.', 'success');
+
+    const onProgress = (progress) => {
+        updateState({ progress });
+    };
+
+    updateState({ isLoading: true, progress: { percentage: 0, message: 'Initializing...' } });
+    
+    // Rövid késleltetés, hogy a UI frissüljön a nehéz munka előtt
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     try {
-      await generatePdf();
+      await generatePdf(onProgress);
       addToast('PDF generated successfully!', 'success');
     } catch (error) {
       console.error("PDF Generation Error:", error);
-      addToast('Failed to generate PDF.', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      addToast(`Failed to generate PDF: ${errorMessage}`, 'error');
     } finally {
       updateState({ isLoading: false });
     }
@@ -54,55 +84,84 @@ async function handleGeneratePdf() {
 
 export function renderApp(container) {
   const state = getState();
-  const { isLoading, sidebarVisible, previewsVisible } = state;
+  const { isLoading, sidebarVisible, isMobileMenuOpen, cardData, designConfig, progress } = state;
 
   const appHtml = `
-    ${isLoading ? `
-      <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-        <div class="flex flex-col items-center">
-          <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500"></div>
-          <p class="text-white text-lg mt-4">Processing...</p>
+    <div id="loading-spinner" class="fixed inset-0 bg-black bg-opacity-80 flex-col items-center justify-center z-50 transition-opacity duration-300" style="display: ${isLoading ? 'flex' : 'none'}">
+        <div class="w-full max-w-md p-4">
+            <div class="text-white text-lg text-center mb-4">${progress.message}</div>
+            <div class="w-full bg-gray-600 rounded-full h-4 mb-2 overflow-hidden">
+                <div class="bg-green-500 h-4 rounded-full transition-all duration-300" style="width: ${progress.percentage}%"></div>
+            </div>
+            <div class="text-center text-white font-bold text-xl">${progress.percentage}%</div>
         </div>
-      </div>` : ''
-    }
+    </div>
     <div id="toast-container-wrapper"></div>
     <div id="modal-container-wrapper"></div>
     
     <div id="header-container"></div>
 
     <div class="flex-grow flex h-full overflow-hidden relative">
-      <div id="sidebar-wrapper" class="flex-shrink-0 transition-all duration-300 ${sidebarVisible ? 'w-96' : 'w-0'} h-[calc(100vh-73px)]"></div>
+      <!-- Mobile Menu Overlay -->
+      <div id="mobile-menu-overlay" class="fixed inset-0 bg-black/60 z-30 md:hidden ${isMobileMenuOpen ? 'block' : 'hidden'}"></div>
       
-      <button id="sidebar-toggle" class="absolute top-1/2 -translate-y-1/2 bg-gray-800 hover:bg-green-700 text-white p-2 rounded-r-lg z-20 transition-all duration-300"
-         style="left: ${sidebarVisible ? 'calc(24rem - 1px)' : '0px'}">
+      <!-- Sidebar / Mobile Drawer -->
+      <div id="sidebar-wrapper" class="absolute md:relative inset-y-0 left-0 z-40 md:z-auto flex-shrink-0 transition-transform duration-300 ease-in-out 
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
+        md:translate-x-0 
+        ${sidebarVisible ? 'w-80' : 'w-0'} 
+        h-[calc(100vh-113px)] md:h-[calc(100vh-73px)]
+      "></div>
+      
+      <!-- Desktop Sidebar Toggle -->
+      <button id="sidebar-toggle" class="hidden md:block absolute top-1/2 -translate-y-1/2 bg-gray-800 hover:bg-green-700 text-white p-2 rounded-r-lg z-20 transition-all duration-300"
+         style="left: ${sidebarVisible ? 'calc(20rem - 1px)' : '0px'}">
          ${sidebarVisible ? ArrowLeftIcon() : ArrowRightIcon()}
       </button>
 
-      <main class="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto bg-gray-800/50" style="background-image: radial-gradient(#4a4a4a 1px, transparent 1px); background-size: 20px 20px;">
-        <div id="fileupload-container"></div>
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
-          <div id="card-preview-container"></div>
-          <div id="page-preview-container"></div>
+      <main class="flex-1 flex flex-col md:flex-row overflow-y-auto bg-gray-800/50" style="background-image: radial-gradient(#4a4a4a 1px, transparent 1px); background-size: 20px 20px;">
+        <div class="flex-1 p-4 md:p-6">
+            <div id="fileupload-container"></div>
+            <!-- Mobile Preview Buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 md:hidden">
+                <div id="mobile-card-preview-btn"></div>
+                <div id="mobile-page-preview-btn"></div>
+            </div>
+        </div>
+        
+        <!-- Desktop Previews (Sticky) -->
+        <div class="hidden md:block w-full md:w-[450px] xl:w-[550px] flex-shrink-0 p-6">
+            <div class="md:sticky md:top-6 space-y-6">
+              <div id="card-preview-container"></div>
+              <div id="page-preview-container"></div>
+            </div>
         </div>
       </main>
+
+      <!-- Mobile Floating Action Button -->
+      <div class="md:hidden fixed bottom-16 right-4 z-20">
+        ${Button({
+            id: 'fab-generate-pdf',
+            content: GenerateIcon(),
+            disabled: cardData.length === 0 && designConfig.mode === 'card',
+            className: "w-16 h-16 rounded-full shadow-lg text-2xl"
+        })}
+      </div>
     </div>
+    <div id="footer-container"></div>
   `;
 
   container.innerHTML = appHtml;
 
-  // Gyerek komponensek renderelése a megfelelő konténerekbe
-  renderHeader(container.querySelector('#header-container'));
-  renderSidebar(container.querySelector('#sidebar-wrapper'), { onGeneratePdf: handleGeneratePdf });
-  renderFileUpload(container.querySelector('#fileupload-container'), { 
-      onFileParse: handleFileParse,
-  });
-  renderCardPreview(container.querySelector('#card-preview-container'));
-  renderPagePreview(container.querySelector('#page-preview-container'));
-  renderToastContainer(container.querySelector('#toast-container-wrapper'));
-  renderEnlargedPreviewModal(container.querySelector('#modal-container-wrapper'));
-
-  // App-szintű eseményfigyelők
-  container.querySelector('#sidebar-toggle').addEventListener('click', () => {
+  // Eseményfigyelők
+  container.querySelector('#sidebar-toggle')?.addEventListener('click', () => {
     updateState({ sidebarVisible: !getState().sidebarVisible });
   });
+
+  const mobileMenuOverlay = container.querySelector('#mobile-menu-overlay');
+  if (mobileMenuOverlay) {
+      mobileMenuOverlay.addEventListener('click', () => updateState({ isMobileMenuOpen: false }));
+  }
+
+  container.querySelector('#fab-generate-pdf')?.addEventListener('click', handleGeneratePdf);
 }

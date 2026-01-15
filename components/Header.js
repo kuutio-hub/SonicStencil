@@ -1,5 +1,5 @@
-import { getState, t, setLanguage, loadDesignConfig, addToast } from '../state.js';
-import { UserIcon, SaveIcon, LoadIcon, UploadIcon } from './ui/Icons.js';
+import { getState, t, setLanguage, loadDesignConfig, addToast, updateState } from '../state.js';
+import { UserIcon, SaveIcon, LoadIcon, UploadIcon, MenuIcon, MoreVerticalIcon } from './ui/Icons.js';
 import { Button } from './ui/Button.js';
 
 function renderSavedConfigsModal(container, onSelect, onClose) {
@@ -39,33 +39,47 @@ function renderSavedConfigsModal(container, onSelect, onClose) {
 }
 
 export function renderHeader(container) {
-  const { language, designConfig } = getState();
+  const { language, designConfig, isMobileActionsOpen } = getState();
 
   const headerHtml = `
-    <header class="flex-shrink-0 bg-gray-900 border-b border-gray-700 p-4 flex flex-col md:flex-row justify-between items-center z-30 gap-4">
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center font-black text-gray-900 text-xl">S</div>
-        <h1 class="text-2xl font-black tracking-tighter text-white">
-          SonicStencil
-        </h1>
+    <header class="flex-shrink-0 bg-gray-900 border-b border-gray-700 p-4 flex justify-between items-center z-30">
+      <div class="flex items-center gap-3">
+        <button id="mobile-menu-toggle" class="md:hidden text-white">${MenuIcon()}</button>
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center font-black text-gray-900 text-xl">S</div>
+            <h1 class="text-xl md:text-2xl font-black tracking-tighter text-white">
+            SonicStencil
+            </h1>
+        </div>
       </div>
-      <div class="flex items-center gap-2 md:gap-3 flex-wrap justify-center">
-        ${Button({ id: 'save-config', content: `${SaveIcon()}<span class="hidden lg:inline ml-2">${t('save')}</span>`, title: t('saveConfig'), className: "h-10" })}
-        ${Button({ id: 'show-load-modal', content: `${LoadIcon()}<span class="hidden lg:inline ml-2">${t('load')}</span>`, title: t('loadConfig'), className: "h-10" })}
-        ${Button({ id: 'download-config', content: `${UploadIcon({className: 'rotate-180'})}<span class="hidden lg:inline ml-2">${t('download')}</span>`, title: t('downloadConfig'), className: "h-10 bg-blue-600 hover:bg-blue-700" })}
+      <div class="flex items-center gap-2 md:gap-3">
+        <!-- Desktop Buttons -->
+        <div class="hidden md:flex items-center gap-2 md:gap-3">
+            ${Button({ id: 'save-config-desktop', content: `${SaveIcon()}<span class="hidden lg:inline ml-2">${t('save')}</span>`, title: t('saveConfig'), className: "h-10" })}
+            ${Button({ id: 'show-load-modal-desktop', content: `${LoadIcon()}<span class="hidden lg:inline ml-2">${t('load')}</span>`, title: t('loadConfig'), className: "h-10" })}
+            ${Button({ id: 'download-config-desktop', content: `${UploadIcon({className: 'rotate-180'})}<span class="hidden lg:inline ml-2">${t('download')}</span>`, title: t('downloadConfig'), className: "h-10 bg-blue-600 hover:bg-blue-700" })}
+        </div>
 
         <select
           id="language-select"
-          class="bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 h-10"
+          class="bg-gray-800 border border-gray-700 text-white rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 h-10"
         >
-          <option value="hu" ${language === 'hu' ? 'selected' : ''}>Magyar</option>
-          <option value="en" ${language === 'en' ? 'selected' : ''}>English</option>
-          <option value="de" ${language === 'de' ? 'selected' : ''}>Deutsch</option>
-          <option value="es" ${language === 'es' ? 'selected' : ''}>Español</option>
-          <option value="fr" ${language === 'fr' ? 'selected' : ''}>Français</option>
+          <option value="hu" ${language === 'hu' ? 'selected' : ''}>HU</option>
+          <option value="en" ${language === 'en' ? 'selected' : ''}>EN</option>
+          <option value="de" ${language === 'de' ? 'selected' : ''}>DE</option>
+          <option value="es" ${language === 'es' ? 'selected' : ''}>ES</option>
+          <option value="fr" ${language === 'fr' ? 'selected' : ''}>FR</option>
         </select>
         
-        ${Button({ content: UserIcon(), title: "Coming Soon", disabled: true, className: "h-10"})}
+        <!-- Mobile Actions Menu -->
+        <div class="relative md:hidden">
+            <button id="mobile-actions-toggle" class="text-white p-2">${MoreVerticalIcon()}</button>
+            <div id="mobile-actions-dropdown" class="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-md shadow-lg z-50 ${isMobileActionsOpen ? 'block' : 'hidden'}">
+                <a href="#" id="save-config-mobile" class="flex items-center gap-2 px-4 py-2 text-sm text-white hover:bg-gray-700">${SaveIcon()} ${t('save')}</a>
+                <a href="#" id="show-load-modal-mobile" class="flex items-center gap-2 px-4 py-2 text-sm text-white hover:bg-gray-700">${LoadIcon()} ${t('load')}</a>
+                <a href="#" id="download-config-mobile" class="flex items-center gap-2 px-4 py-2 text-sm text-white hover:bg-gray-700">${UploadIcon({className:'rotate-180'})} ${t('download')}</a>
+            </div>
+        </div>
       </div>
       <div id="modal-container"></div>
     </header>
@@ -73,20 +87,40 @@ export function renderHeader(container) {
 
   container.innerHTML = headerHtml;
   
-  // Eseményfigyelők
+  // --- Event Listeners ---
   container.querySelector('#language-select').addEventListener('change', (e) => setLanguage(e.target.value));
 
-  container.querySelector('#save-config').addEventListener('click', () => {
+  // Mobile Menu Toggle
+  container.querySelector('#mobile-menu-toggle').addEventListener('click', () => {
+    updateState({ isMobileMenuOpen: !getState().isMobileMenuOpen });
+  });
+
+  // Mobile Actions Dropdown
+  const actionsToggle = container.querySelector('#mobile-actions-toggle');
+  actionsToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updateState({ isMobileActionsOpen: !getState().isMobileActionsOpen });
+  });
+  // Close dropdown if clicked outside
+  window.addEventListener('click', (e) => {
+      if (getState().isMobileActionsOpen && !actionsToggle.contains(e.target)) {
+          updateState({ isMobileActionsOpen: false });
+      }
+  });
+
+
+  const handleSave = () => {
       const configName = prompt(t('enterConfigName'));
       if (configName) {
         const savedConfigs = JSON.parse(localStorage.getItem('designConfigs') || '[]');
         savedConfigs.push({ name: configName, config: getState().designConfig });
         localStorage.setItem('designConfigs', JSON.stringify(savedConfigs));
         addToast(t('configSaved'), 'success');
+        updateState({ isMobileActionsOpen: false });
       }
-  });
+  };
 
-  container.querySelector('#download-config').addEventListener('click', () => {
+  const handleDownload = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(designConfig, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -95,10 +129,12 @@ export function renderHeader(container) {
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
     addToast(t('configDownloaded'), 'success');
-  });
-
+    updateState({ isMobileActionsOpen: false });
+  };
+  
   const modalContainer = container.querySelector('#modal-container');
-  const showModal = () => {
+  const showLoadModal = () => {
+    updateState({ isMobileActionsOpen: false });
     renderSavedConfigsModal(
         modalContainer,
         (selectedConfig) => {
@@ -109,5 +145,14 @@ export function renderHeader(container) {
         () => modalContainer.innerHTML = ''
     );
   };
-  container.querySelector('#show-load-modal').addEventListener('click', showModal);
+  
+  // Desktop listeners
+  container.querySelector('#save-config-desktop').addEventListener('click', handleSave);
+  container.querySelector('#download-config-desktop').addEventListener('click', handleDownload);
+  container.querySelector('#show-load-modal-desktop').addEventListener('click', showLoadModal);
+
+  // Mobile listeners
+  container.querySelector('#save-config-mobile').addEventListener('click', handleSave);
+  container.querySelector('#download-config-mobile').addEventListener('click', handleDownload);
+  container.querySelector('#show-load-modal-mobile').addEventListener('click', showLoadModal);
 }
